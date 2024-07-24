@@ -1,6 +1,9 @@
-use actix_web::{web, HttpResponse, post, Responder};
-use validator::{Validate, ValidationError};
 use crate::models::auth::RegisterInput;
+use crate::models::users::User;
+use crate::Database;
+use actix_web::{post, web, HttpResponse, Responder};
+use chrono::Utc;
+use validator::{Validate, ValidationError};
 
 // 1. Register User
 //    POST /api/auth/register
@@ -8,17 +11,26 @@ use crate::models::auth::RegisterInput;
 //    Output: { "id": string, "username": string, "email": string, "token": string }
 
 #[post("/register")]
-async fn register(input: web::Json<RegisterInput>) -> impl Responder {
+async fn register(input: web::Json<RegisterInput>, db: web::Data<Database>) -> impl Responder {
     let input = input.into_inner();
     match input.validate() {
-        Ok(_) => HttpResponse::Ok().body("Valid input"),
-        Err(e) => {
-            HttpResponse::BadRequest().json(e)
-        }
+        Ok(_) => (),
+        Err(e) => return HttpResponse::BadRequest().json(e),
     }
 
-    
+    db.create_user(User {
+        id: None,
+        username: input.username,
+        email: input.email,
+        password_hash: input.password,
+        created_at: Utc::now(),
+        last_login: None,
+        status: "active".to_string(),
+    })
+    .await
+    .unwrap();
 
+    HttpResponse::Ok().body("valid")
 }
 
 //

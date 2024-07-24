@@ -18,7 +18,7 @@ async fn main() -> std::io::Result<()> {
     let refresh_secret = env::var("REFRESH_KEY").expect("REFRESH_KEY must be set");
     let jwt_manager = JwtManager::new(access_secret.as_bytes(), refresh_secret.as_bytes());
 
-    let db = Database::new("StudyBuddy", "auth").await;
+    let db = Database::new("StudyBuddy", "auth").await.unwrap();
     let db = web::Data::new(db);
 
     HttpServer::new(move || {

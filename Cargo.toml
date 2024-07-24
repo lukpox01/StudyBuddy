@@ -11,3 +11,4 @@ validator = { version = "0.18.1", features = ["derive"] }
 surrealdb = "1.5.4"
 jwt = { path = "jwt" }
 dotenv = "0.15.0"
+chrono = { version = "0.4", features = ["serde"] }
