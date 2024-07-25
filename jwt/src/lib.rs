@@ -1,7 +1,9 @@
+mod error;
+use error::JwtError;
+
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
@@ -9,18 +11,6 @@ pub struct Claims {
     exp: i64,
     iat: i64,
     token_type: String,
-}
-
-#[derive(Error, Debug)]
-pub enum JwtError {
-    #[error("Failed to create token")]
-    TokenCreationError,
-    #[error("Failed to decode token")]
-    TokenDecodingError,
-    #[error("Token expired")]
-    TokenExpired,
-    #[error("Invalid token type")]
-    InvalidTokenType,
 }
 
 pub struct JwtManager {
@@ -41,14 +31,30 @@ impl JwtManager {
     }
 
     pub fn create_access_token(&self, user_id: &str) -> Result<String, JwtError> {
-        self.create_token(user_id, Duration::minutes(15), "access", &self.access_encoding_key)
+        self.create_token(
+            user_id,
+            Duration::minutes(15),
+            "access",
+            &self.access_encoding_key,
+        )
     }
 
     pub fn create_refresh_token(&self, user_id: &str) -> Result<String, JwtError> {
-        self.create_token(user_id, Duration::days(7), "refresh", &self.refresh_encoding_key)
+        self.create_token(
+            user_id,
+            Duration::days(7),
+            "refresh",
+            &self.refresh_encoding_key,
+        )
     }
 
-    fn create_token(&self, user_id: &str, duration: Duration, token_type: &str, key: &EncodingKey) -> Result<String, JwtError> {
+    fn create_token(
+        &self,
+        user_id: &str,
+        duration: Duration,
+        token_type: &str,
+        key: &EncodingKey,
+    ) -> Result<String, JwtError> {
         let now = Utc::now();
         let expires_at = now + duration;
         let claims = Claims {
@@ -57,9 +63,9 @@ impl JwtManager {
             exp: expires_at.timestamp(),
             token_type: token_type.to_owned(),
         };
-        let token = match encode(&Header::default(), &claims, key){
+        let token = match encode(&Header::default(), &claims, key) {
             Ok(v) => v,
-            Err(_) => return Err(JwtError::TokenCreationError)
+            Err(_) => return Err(JwtError::TokenCreationError),
         };
         Ok(token)
     }
@@ -72,11 +78,16 @@ impl JwtManager {
         self.verify_token(token, &self.refresh_decoding_key, "refresh")
     }
 
-    fn verify_token(&self, token: &str, key: &DecodingKey, expected_type: &str) -> Result<Claims, JwtError> {
+    fn verify_token(
+        &self,
+        token: &str,
+        key: &DecodingKey,
+        expected_type: &str,
+    ) -> Result<Claims, JwtError> {
         let validation = Validation::default();
         let token_data = match decode::<Claims>(token, key, &validation) {
             Ok(v) => v,
-            Err(_) => return Err(JwtError::TokenDecodingError)
+            Err(_) => return Err(JwtError::TokenDecodingError),
         };
 
         let now = Utc::now().timestamp();

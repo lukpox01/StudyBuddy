@@ -1,8 +1,8 @@
+use std::env;
+
 use actix_web::{web, App, HttpServer, Responder};
 use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
-
-use std::env;
 
 use db::database::Database;
 use endpoints::auth;
@@ -26,7 +26,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(db.clone())
             .service(web::scope("/auth").service(auth::register))
     })
-    .bind("127.0.0.1:8080")?
+    .bind("127.0.0.1:6666")?
     .run()
     .await
 }

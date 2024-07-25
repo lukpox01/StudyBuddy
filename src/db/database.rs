@@ -1,16 +1,16 @@
-use chrono::Utc;
-use serde::Deserialize;
+use crate::db::errors::DatabaseError;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::opt::auth::Root;
-use surrealdb::sql::{Thing, Value};
+use surrealdb::sql::{Datetime, Thing, Value};
+use surrealdb::syn::v1::literal::datetime;
 use surrealdb::Surreal;
-
-use crate::db::errors::DatabaseError;
 
 use crate::models::users::User;
 
-#[derive(Debug, Deserialize)]
-struct Record {
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Record {
     #[allow(dead_code)]
     id: Thing,
 }
@@ -50,7 +50,7 @@ impl Database {
                 DEFINE FIELD email ON user TYPE string;
                 DEFINE FIELD password_hash ON user TYPE string;
                 DEFINE FIELD created_at ON user TYPE datetime;
-                DEFINE FIELD last_login ON user TYPE datetime;
+                DEFINE FIELD last_login ON user TYPE option<datetime>;
                 DEFINE FIELD status ON user TYPE string;
                 DEFINE INDEX email_idx ON user FIELDS email UNIQUE;
             ",
@@ -96,15 +96,19 @@ impl Database {
         Ok(Database { db })
     }
 
-    async fn insert_user(
-        &self,
-        db_url: &str,
-        namespace: &str,
-        database: &str,
-        user_data: User,
-    ) -> Result<Value, surrealdb::Error> {
-        let response = self.db.create("user").content(user_data).await?;
-
-        Ok(responsee)
+    pub async fn create_user(&self, user_data: User) -> Result<Vec<Record>, DatabaseError> {
+        match self.db.create("user").content(user_data).await {
+            Ok(v) => Ok(v),
+            Err(_) => Err(DatabaseError::CreationError),
+        }
     }
+
+    async fn select_by_id(&self, id: Thing) -> Result<Option<Record>, DatabaseError> {
+        match self.db.select(id).await {
+            Ok(v) => Ok(v),
+            Err(_) => Err(DatabaseError::QueryError),
+        }
+    }
+
+    pub async fn select_user_by_id(&self, id: &str) {}
 }

@@ -12,3 +12,6 @@ surrealdb = "1.5.4"
 jwt = { path = "jwt" }
 dotenv = "0.15.0"
 chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0.63"
+uuid = "1.10.0"
+bcrypt = "0.15.1"

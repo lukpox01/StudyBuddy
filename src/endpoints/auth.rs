@@ -2,7 +2,10 @@ use crate::models::auth::RegisterInput;
 use crate::models::users::User;
 use crate::Database;
 use actix_web::{post, web, HttpResponse, Responder};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
+use serde_json::json;
+use surrealdb::sql::{Datetime, Thing, Value};
+use uuid::Uuid;
 use validator::{Validate, ValidationError};
 
 // 1. Register User
@@ -18,19 +21,23 @@ async fn register(input: web::Json<RegisterInput>, db: web::Data<Database>) -> i
         Err(e) => return HttpResponse::BadRequest().json(e),
     }
 
-    db.create_user(User {
-        id: None,
-        username: input.username,
-        email: input.email,
-        password_hash: input.password,
-        created_at: Utc::now(),
-        last_login: None,
-        status: "active".to_string(),
-    })
-    .await
-    .unwrap();
+    let password = bcrypt::hash(input.password.clone(), bcrypt::DEFAULT_COST).unwrap();
 
-    HttpResponse::Ok().body("valid")
+    match db
+        .insert_user(User {
+            id: Thing::from(("user", Uuid::new_v4().to_string().as_str())),
+            username: input.username,
+            email: input.email,
+            password_hash: password,
+            created_at: Datetime(Utc::now()),
+            last_login: None,
+            status: "active".to_string(),
+        })
+        .await
+    {
+        Ok(v) => HttpResponse::Ok().json(json!({ "id": v })),
+        Err(e) => HttpResponse::InternalServerError().json(json!(e)),
+    }
 }
 
 //
