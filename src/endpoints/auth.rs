@@ -1,12 +1,14 @@
-use crate::models::auth::RegisterInput;
-use crate::models::users::User;
-use crate::Database;
-use actix_web::{post, web, HttpResponse, Responder};
+use actix_web::{HttpResponse, post, Responder, web};
 use chrono::{DateTime, Utc};
 use serde_json::json;
 use surrealdb::sql::{Datetime, Thing, Value};
 use uuid::Uuid;
 use validator::{Validate, ValidationError};
+
+use crate::Database;
+use crate::models::auth::{LoginInput, RegisterInput, VerificationToken};
+use crate::models::users::User;
+use crate::services::email::send_verification_email;
 
 // 1. Register User
 //    POST /api/auth/register
@@ -22,20 +24,23 @@ async fn register(input: web::Json<RegisterInput>, db: web::Data<Database>) -> i
     }
 
     let password = bcrypt::hash(input.password.clone(), bcrypt::DEFAULT_COST).unwrap();
-
+    let id = Uuid::new_v4().to_string();
     match db
-        .insert_user(User {
-            id: Thing::from(("user", Uuid::new_v4().to_string().as_str())),
+        .create_user(User {
+            id: Thing::from(("user", id.clone().as_str())),
             username: input.username,
-            email: input.email,
+            email: input.email.clone(),
             password_hash: password,
             created_at: Datetime(Utc::now()),
             last_login: None,
-            status: "active".to_string(),
+            status: "unverified".to_string(),
         })
         .await
     {
-        Ok(v) => HttpResponse::Ok().json(json!({ "id": v })),
+        Ok(v) => {
+            HttpResponse::Ok().json(json!({ "id": v }))
+            //TODO send verification email
+        }
         Err(e) => HttpResponse::InternalServerError().json(json!(e)),
     }
 }
@@ -45,6 +50,28 @@ async fn register(input: web::Json<RegisterInput>, db: web::Data<Database>) -> i
 //    POST /api/auth/login
 //    Input:  { "email": string, "password": string }
 //    Output: { "id": string, "username": string, "accessToken": string, "refreshToken": string, "expiresIn": number }
+
+#[post("/login")]
+async fn login(input: web::Json<LoginInput>, db: web::Data<Database>) -> impl Responder {
+    let input = input.into_inner();
+    match input.validate() {
+        Ok(_) => (),
+        Err(e) => return HttpResponse::BadRequest().json(e),
+    }
+
+    match db.select_user_by_email(input.email.clone().as_str()).await {
+        Ok(user) => {
+            if bcrypt::verify(input.password.clone(), user.password_hash.clone().as_str()).unwrap() {
+                HttpResponse::Ok().json(json!(user))
+            } else {
+                HttpResponse::Unauthorized().json(json!({ "message": "Invalid email or passwordd" }))
+            }
+        }
+        Err(e) => HttpResponse::InternalServerError().json(json!(e)),
+    }
+}
+
+
 //
 // 3. Logout User
 //    POST /api/auth/logout

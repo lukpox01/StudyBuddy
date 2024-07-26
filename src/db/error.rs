@@ -13,4 +13,6 @@ pub enum DatabaseError {
     QueryError,
     #[error("Failed to create record")]
     CreationError,
+    #[error("Unknown identifier")]
+    UnknownID,
 }

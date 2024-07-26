@@ -1,10 +1,9 @@
-mod error;
-use error::JwtError;
-
 use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use error::JwtError;
+use jsonwebtoken::{decode, DecodingKey, encode, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
+mod error;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     sub: String,

@@ -1,4 +1,3 @@
-
 // 4. Get User Profile
 //    GET /api/users/me
 //    Input:  No body, requires valid access token in Authorization header

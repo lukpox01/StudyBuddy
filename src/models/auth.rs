@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
-use validator::{Validate, ValidationError};
+use surrealdb::sql::{Datetime, Thing};
+use uuid::Uuid;
+use validator::Validate;
 
 #[derive(Debug, Validate, Deserialize, Serialize)]
 pub struct RegisterInput {
@@ -9,4 +11,19 @@ pub struct RegisterInput {
     pub email: String,
     #[validate(length(min = 6, max = 50, message = "Password must be between 6 and 50 characters"))]
     pub password: String,
+}
+
+#[derive(Debug, Validate, Deserialize, Serialize)]
+pub struct LoginInput {
+    #[validate(email(message = "Invalid email address"))]
+    pub email: String,
+    #[validate(length(min = 6, max = 50, message = "Password must be between 6 and 50 characters"))]
+    pub password: String,
+}
+
+#[derive(Debug, Validate, Deserialize, Serialize)]
+pub struct VerificationToken {
+    pub user_id: Thing,
+    pub token: Uuid,
+    pub expires_at: Datetime,
 }
