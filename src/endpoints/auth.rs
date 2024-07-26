@@ -1,14 +1,13 @@
-use actix_web::{HttpResponse, post, Responder, web};
-use chrono::{DateTime, Utc};
+use actix_web::{post, web, HttpResponse, Responder};
+use chrono::Utc;
 use serde_json::json;
-use surrealdb::sql::{Datetime, Thing, Value};
+use surrealdb::sql::{Datetime, Thing};
 use uuid::Uuid;
-use validator::{Validate, ValidationError};
+use validator::Validate;
 
-use crate::Database;
-use crate::models::auth::{LoginInput, RegisterInput, VerificationToken};
+use crate::models::auth::{LoginInput, RegisterInput};
 use crate::models::users::User;
-use crate::services::email::send_verification_email;
+use crate::Database;
 
 // 1. Register User
 //    POST /api/auth/register
@@ -61,16 +60,17 @@ async fn login(input: web::Json<LoginInput>, db: web::Data<Database>) -> impl Re
 
     match db.select_user_by_email(input.email.clone().as_str()).await {
         Ok(user) => {
-            if bcrypt::verify(input.password.clone(), user.password_hash.clone().as_str()).unwrap() {
+            if bcrypt::verify(input.password.clone(), user.password_hash.clone().as_str()).unwrap()
+            {
                 HttpResponse::Ok().json(json!(user))
             } else {
-                HttpResponse::Unauthorized().json(json!({ "message": "Invalid email or passwordd" }))
+                HttpResponse::Unauthorized()
+                    .json(json!({ "message": "Invalid email or passwordd" }))
             }
         }
         Err(e) => HttpResponse::InternalServerError().json(json!(e)),
     }
 }
-
 
 //
 // 3. Logout User

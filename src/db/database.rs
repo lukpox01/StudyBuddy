@@ -1,4 +1,3 @@
-use actix_web::web::Buf;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use surrealdb::engine::remote::ws::{Client, Ws};
@@ -103,7 +102,7 @@ impl Database {
                 DEFINE FIELD user_id ON verification_token TYPE record(user);
                 DEFINE FIELD expires_at ON verification_token TYPE datetime;
                 DEFINE INDEX token_idx ON verification_token FIELDS token UNIQUE;
-            "
+            ",
             )
             .await
         {
@@ -137,24 +136,28 @@ impl Database {
     }
 
     pub async fn select_user_by_email(&self, email: &str) -> Result<User, DatabaseError> {
-        match self.db.query("SELECT * FROM user WHERE email = $email").bind(("email", email)).await {
-            Ok(mut v) => {
-                match v.take::<Option<User>>(0) {
-                    Ok(v) => {
-                        
-                        match v {
-                            Some(v) => Ok(v),
-                            None => Err(DatabaseError::QueryError),
-                        }
-                    },
-                    Err(_) => Err(DatabaseError::QueryError),
-                }
-            }
+        match self
+            .db
+            .query("SELECT * FROM user WHERE email = $email")
+            .bind(("email", email))
+            .await
+        {
+            Ok(mut v) => match v.take::<Option<User>>(0) {
+                Ok(v) => match v {
+                    Some(v) => Ok(v),
+                    None => Err(DatabaseError::QueryError),
+                },
+                Err(_) => Err(DatabaseError::QueryError),
+            },
             Err(_) => Err(DatabaseError::QueryError),
         }
     }
 
-    pub async fn create_verification_token(&self, user_id: &str, token: Uuid) -> Result<Option<Record>, DatabaseError> {
+    pub async fn create_verification_token(
+        &self,
+        user_id: &str,
+        token: Uuid,
+    ) -> Result<Option<Record>, DatabaseError> {
         let expires_at = Datetime(Utc::now() + chrono::Duration::days(1));
         let user_id = Thing::from(("user", user_id));
 
@@ -164,7 +167,12 @@ impl Database {
             expires_at,
         };
 
-        match self.db.create(("verification_token", token.to_string().as_str())).content(verification_token).await {
+        match self
+            .db
+            .create(("verification_token", token.to_string().as_str()))
+            .content(verification_token)
+            .await
+        {
             Ok(v) => Ok(v),
             Err(_) => Err(DatabaseError::CreationError),
         }
@@ -175,11 +183,11 @@ impl Database {
         match self.select_by_id(token).await {
             Ok(Some(v)) => {
                 let id: String = match v.id.id {
-                    Id::Number(v) => { v.to_string() }
-                    Id::String(v) => { v }
-                    Id::Array(v) => { return Err(DatabaseError::UnknownID) }
-                    Id::Object(v) => { return Err(DatabaseError::UnknownID) }
-                    Id::Generate(V) => { return Err(DatabaseError::UnknownID) }
+                    Id::Number(v) => v.to_string(),
+                    Id::String(v) => v,
+                    Id::Array(_) => return Err(DatabaseError::UnknownID),
+                    Id::Object(_) => return Err(DatabaseError::UnknownID),
+                    Id::Generate(_) => return Err(DatabaseError::UnknownID),
                 };
                 let user = match self.select_user_by_id(id.as_str()).await {
                     Ok(Some(v)) => v,

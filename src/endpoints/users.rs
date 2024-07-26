@@ -13,4 +13,3 @@
 //     GET /api/users/{userId}
 //     Input:  User ID in URL parameter, requires valid admin access token in Authorization header
 //     Output: { "id": string, "username": string, "email": string, "createdAt": string, "lastLogin": string, "status": string }
-

@@ -1,8 +1,7 @@
 use std::env;
 
-use actix_web::{App, HttpServer, Responder, web};
+use actix_web::{web, App, HttpServer};
 use dotenv::dotenv;
-use serde::{Deserialize, Serialize};
 
 use db::database::Database;
 use endpoints::auth;
@@ -30,7 +29,7 @@ async fn main() -> std::io::Result<()> {
                 .service(auth::login),
         )
     })
-        .bind("127.0.0.1:6666")?
-        .run()
-        .await
+    .bind("127.0.0.1:6666")?
+    .run()
+    .await
 }
