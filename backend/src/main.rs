@@ -7,7 +7,6 @@ use db::database::Database;
 use endpoints::auth;
 
 // use jwt::JwtManager;
-
 mod db;
 mod endpoints;
 mod models;
