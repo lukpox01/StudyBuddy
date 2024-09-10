@@ -11,12 +11,13 @@ mod db;
 mod endpoints;
 mod models;
 mod services;
+mod jwt;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
-    let access_secret = env::var("ACCESS_KEY").expect("ACCESS_KEY must be set");
-    let refresh_secret = env::var("REFRESH_KEY").expect("REFRESH_KEY must be set");
+    // let access_secret = env::var("ACCESS_KEY").expect("ACCESS_KEY must be set");
+    // let refresh_secret = env::var("REFRESH_KEY").expect("REFRESH_KEY must be set");
 
     let db = Database::new("StudyBuddy", "auth").await.unwrap();
     let db = web::Data::new(db);
@@ -25,7 +26,9 @@ async fn main() -> std::io::Result<()> {
         App::new().app_data(db.clone()).service(
             web::scope("/auth")
                 .service(auth::register)
-                .service(auth::login),
+                .service(auth::login)
+                .service(auth::verify),
+
         )
     })
     .bind("127.0.0.1:6666")?

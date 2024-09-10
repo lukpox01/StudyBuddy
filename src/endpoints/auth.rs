@@ -5,9 +5,10 @@ use surrealdb::sql::{Datetime, Thing};
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::models::auth::{LoginInput, RegisterInput};
+use crate::models::auth::{LoginInput, RegisterInput, VerifyToken};
 use crate::models::users::User;
 use crate::Database;
+use crate::jwt::jwt::*;
 
 // 1. Register User
 //    POST /api/auth/register
@@ -37,7 +38,14 @@ async fn register(input: web::Json<RegisterInput>, db: web::Data<Database>) -> i
         .await
     {
         Ok(v) => {
-            HttpResponse::Ok().json(json!({ "id": v }))
+
+            let secret = Uuid::new_v4().to_string();
+            match db.add_secret(v[0].id.clone(), &secret).await{
+                Ok(_) => (),
+                Err(e) => return HttpResponse::InternalServerError().json(json!(e)),
+            };
+
+            HttpResponse::Ok().json(json!({"secret": secret}))
             //TODO send verification email
         }
         Err(e) => HttpResponse::InternalServerError().json(json!(e)),
@@ -62,14 +70,44 @@ async fn login(input: web::Json<LoginInput>, db: web::Data<Database>) -> impl Re
         Ok(user) => {
             if bcrypt::verify(input.password.clone(), user.password_hash.clone().as_str()).unwrap()
             {
-                HttpResponse::Ok().json(json!(user))
+                let secret = match db.get_secret_by_email(user.email.as_str()).await{
+                    Ok(secret) => secret,
+                    Err(e) => return HttpResponse::InternalServerError().json(json!(e)),
+                };
+                let access_token = create_access_token(user.id.to_string().as_str(), secret.token.as_bytes()).unwrap();
+                HttpResponse::Ok().json(json!({"token": access_token}))
             } else {
                 HttpResponse::Unauthorized()
-                    .json(json!({ "message": "Invalid email or passwordd" }))
+                    .json(json!({ "message": "Invalid email or password" }))
             }
         }
         Err(e) => HttpResponse::InternalServerError().json(json!(e)),
     }
+}
+
+// Verify Token
+//    POST /api/auth/verify
+//    Input:  { "token": string, email: string }
+//    Output: { bool }
+
+#[post("/verify")]
+async fn verify(input: web::Json<VerifyToken>, db: web::Data<Database>) -> impl Responder {
+    let input = input.into_inner();
+    match input.validate() {
+        Ok(_) => (),
+        Err(e) => return HttpResponse::BadRequest().json(e),
+    }
+
+    match db.get_secret_by_email(input.email.as_str()).await{
+        Ok(secret) => {
+            match verify_access_token(input.token.clone().as_str(), secret.token.as_bytes()){
+                Ok(_) => HttpResponse::Ok().json(true),
+                Err(_) => HttpResponse::Ok().json(false),
+            }
+        }
+        Err(e) => HttpResponse::InternalServerError().json(json!(e)),
+    }
+
 }
 
 //

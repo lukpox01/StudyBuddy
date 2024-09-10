@@ -7,7 +7,7 @@ use surrealdb::Surreal;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::models::auth::VerificationToken;
+use crate::models::auth::{VerificationToken, AddSecret, GetSecret};
 use crate::models::users::User;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -65,43 +65,10 @@ impl Database {
         match db
             .query(
                 "
-                DEFINE TABLE session SCHEMAFULL;
-                DEFINE FIELD user_id ON session TYPE record(user);
-                DEFINE FIELD refresh_token ON session TYPE string;
-                DEFINE FIELD expires_at ON session TYPE datetime;
-                DEFINE INDEX refresh_token_idx ON session FIELDS refresh_token UNIQUE;
-            ",
-            )
-            .await
-        {
-            Ok(_) => (),
-            Err(_) => return Err(DatabaseError::QueryError),
-        };
-
-        match db
-            .query(
-                "
-                DEFINE TABLE password_reset SCHEMAFULL;
-                DEFINE FIELD user_id ON password_reset TYPE record(user);
-                DEFINE FIELD token ON password_reset TYPE string;
-                DEFINE FIELD expires_at ON password_reset TYPE datetime;
-                DEFINE INDEX reset_token_idx ON password_reset FIELDS token UNIQUE;
-            ",
-            )
-            .await
-        {
-            Ok(_) => (),
-            Err(_) => return Err(DatabaseError::QueryError),
-        };
-
-        match db
-            .query(
-                "
-                DEFINE TABLE verification_token SCHEMAFULL;
-                DEFINE FIELD token ON verification_token TYPE string;
-                DEFINE FIELD user_id ON verification_token TYPE record(user);
-                DEFINE FIELD expires_at ON verification_token TYPE datetime;
-                DEFINE INDEX token_idx ON verification_token FIELDS token UNIQUE;
+                DEFINE TABLE secret SCHEMAFULL;
+                DEFINE FIELD user_id ON secret TYPE record(user);
+                DEFINE FIELD token ON secret TYPE string;
+                DEFINE INDEX token_idx ON secret FIELDS token UNIQUE;
             ",
             )
             .await
@@ -114,7 +81,16 @@ impl Database {
     }
 
     pub async fn create_user(&self, user_data: User) -> Result<Vec<User>, DatabaseError> {
-        match self.db.create("user").content(user_data).await {
+        let input = User {
+            id: Thing::from(("user", Uuid::new_v4().to_string().as_str())),
+            username: user_data.username,
+            email: user_data.email,
+            password_hash: user_data.password_hash,
+            created_at: Datetime(Utc::now()),
+            last_login: None,
+            status: user_data.status,
+        };
+        match self.db.create("user").content(input).await {
             Ok(v) => Ok(v),
             Err(_) => Err(DatabaseError::CreationError),
         }
@@ -153,56 +129,49 @@ impl Database {
         }
     }
 
-    pub async fn create_verification_token(
-        &self,
-        user_id: &str,
-        token: Uuid,
-    ) -> Result<Option<Record>, DatabaseError> {
-        let expires_at = Datetime(Utc::now() + chrono::Duration::days(1));
-        let user_id = Thing::from(("user", user_id));
-
-        let verification_token = VerificationToken {
+    pub async fn add_secret(&self, user_id: Thing, token: &str) -> Result<Vec<Record>, DatabaseError> {
+        let input = AddSecret {
+            token: token.to_string(),
             user_id,
-            token,
-            expires_at,
         };
+        match self.db.create("secret").content(input).await {
+            Ok(v) => Ok(v),
+            Err(_) => Err(DatabaseError::SecretError),
+        }
+    }
 
+    pub async fn get_secret_by_email(&self, email: &str) -> Result<GetSecret, DatabaseError> {
         match self
             .db
-            .create(("verification_token", token.to_string().as_str()))
-            .content(verification_token)
+            .query("SELECT * FROM user WHERE email = $email")
+            .bind(("email", email))
             .await
         {
-            Ok(v) => Ok(v),
-            Err(_) => Err(DatabaseError::CreationError),
+            Ok(mut v) => match v.take::<Option<User>>(0) {
+                Ok(v) => match v {
+                    Some(v) => {
+                        match self
+                            .db
+                            .query("SELECT * FROM secret WHERE user_id = $user_id")
+                            .bind(("user_id", v.id))
+                            .await
+                        {
+                            Ok(mut v) => match v.take::<Option<GetSecret>>(0) {
+                                Ok(v) => match v {
+                                    Some(v) => Ok(v),
+                                    None => Err(DatabaseError::SecretNotFound),
+                                },
+                                Err(_) => Err(DatabaseError::SecretNotFound),
+                            },
+                            Err(_) => Err(DatabaseError::SecretNotFound),
+                        }
+                    },
+                    None => Err(DatabaseError::UserNotFound),
+                },
+                Err(_) => Err(DatabaseError::UserNotFound),
+            },
+            Err(_) => Err(DatabaseError::UserNotFound),
         }
-    }
 
-    pub async fn verify_email_token(&self, token: Uuid) -> Result<Option<Record>, DatabaseError> {
-        let token = Thing::from(("verification_token", token.to_string().as_str()));
-        match self.select_by_id(token).await {
-            Ok(Some(v)) => {
-                let id: String = match v.id.id {
-                    Id::Number(v) => v.to_string(),
-                    Id::String(v) => v,
-                    Id::Array(_) => return Err(DatabaseError::UnknownID),
-                    Id::Object(_) => return Err(DatabaseError::UnknownID),
-                    Id::Generate(_) => return Err(DatabaseError::UnknownID),
-                };
-                let user = match self.select_user_by_id(id.as_str()).await {
-                    Ok(Some(v)) => v,
-                    Ok(None) => return Err(DatabaseError::QueryError),
-                    Err(e) => return Err(e),
-                };
-
-                Ok(Some(user))
-            }
-            Ok(None) => Ok(None),
-            Err(e) => Err(e),
-        }
-    }
-
-    pub async fn activate_user(&self, id: Thing) -> Result<(), DatabaseError> {
-        todo!()
     }
 }

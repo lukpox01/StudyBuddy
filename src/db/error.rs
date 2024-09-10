@@ -15,4 +15,11 @@ pub enum DatabaseError {
     CreationError,
     #[error("Unknown identifier")]
     UnknownID,
+    #[error("Record not found")]
+    SecretNotFound,
+    #[error("User not found")]
+    UserNotFound,
+    #[error("Secret cannot be created")]
+    SecretError,
+
 }

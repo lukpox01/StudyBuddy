@@ -20,6 +20,18 @@ pub struct RegisterInput {
     ))]
     pub password: String,
 }
+#[derive(Debug, Validate, Deserialize, Serialize)]
+pub struct AddSecret {
+    pub token: String,
+    pub user_id: Thing,
+}
+
+#[derive(Debug, Validate, Deserialize, Serialize)]
+pub struct GetSecret {
+    pub token: String,
+    pub user_id: Thing,
+}
+
 
 #[derive(Debug, Validate, Deserialize, Serialize)]
 pub struct LoginInput {
@@ -31,6 +43,14 @@ pub struct LoginInput {
         message = "Password must be between 6 and 50 characters"
     ))]
     pub password: String,
+}
+
+#[derive(Debug, Validate, Deserialize, Serialize)]
+pub struct VerifyToken {
+    #[validate(email(message = "Invalid email address"))]
+    pub email: String,
+
+    pub token: String,
 }
 
 #[derive(Debug, Validate, Deserialize, Serialize)]
